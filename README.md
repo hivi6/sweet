@@ -27,7 +27,7 @@ literal         := [0-9]+
 
 ### print from 0 to 10 (inclusive)
 ```
-a = 0
+a = 0;
 label start;
 print a;
 if (a <= 10) goto start;

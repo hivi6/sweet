@@ -1,0 +1,4 @@
+a = 0;
+label start;
+print a;
+if (a <= 10) goto start; &&

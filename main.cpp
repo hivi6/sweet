@@ -1,4 +1,6 @@
 #include <map>
+#include <vector>
+#include <fstream>
 #include <iostream>
 using namespace std;
 
@@ -6,13 +8,13 @@ using namespace std;
 // Position
 // ==================================================
 
-static const string EMPTY_STRING = "";
+static string EMPTY_STRING = "";
 
 struct Position
 {
-    string fname;      // name of the file
-    const string &src; // content of the file
-    int idx, ln, col;  // current index, line number and column number
+    string fname;     // name of the file
+    string &src;      // content of the file
+    int idx, ln, col; // current index, line number and column number
 
     Position()
         : fname{"<stdin>"}, src{EMPTY_STRING}, idx{0}, ln{1}, col{1} {}
@@ -20,6 +22,15 @@ struct Position
         : fname{filename}, src{source}, idx{0}, ln{1}, col{1} {}
     Position(string filename, string &source, int index, int line, int column)
         : fname{filename}, src{source}, idx{index}, ln{line}, col{column} {}
+
+    void operator=(const Position &pos)
+    {
+        fname = pos.fname;
+        src = pos.src;
+        idx = pos.idx;
+        ln = pos.ln;
+        col = pos.col;
+    }
 
     void advance()
     {
@@ -60,7 +71,7 @@ ostream &operator<<(ostream &out, const Position &pos)
 // Token
 // ==================================================
 
-enum class TokenType
+enum struct TokenType
 {
     TT_LITERAL,
     TT_VARIABLE,
@@ -109,7 +120,7 @@ ostream &operator<<(ostream &out, TokenType type)
         {TokenType::TT_MULTIPLY, "TT_MULTIPLY"},
         {TokenType::TT_DIVIDE, "TT_DIVIDE"},
     };
-    cout << TokenTypeToString.at(type);
+    out << TokenTypeToString.at(type);
     return out;
 };
 
@@ -157,7 +168,7 @@ ostream &operator<<(ostream &out, const Token &token)
 // Error
 // ==================================================
 
-enum class ErrorType
+enum struct ErrorType
 {
     ILLEGAL_CHARACTER_ERROR,
     NO_ERROR,
@@ -178,9 +189,17 @@ struct Error
         : typ{ErrorType::NO_ERROR} {}
     Error(ErrorType type, string details, Position start, Position end)
         : typ{type}, deets{details}, startPos{start}, endPos{end} {}
+
+    void operator=(const Error &error)
+    {
+        typ = error.typ;
+        deets = error.deets;
+        startPos = error.startPos;
+        endPos = error.endPos;
+    }
 };
 
-ostream &operator<<(ostream& out, const Error& error)
+ostream &operator<<(ostream &out, const Error &error)
 {
     out << ERROR_NAME.at(error.typ) << ": " << error.deets;
     return out;
@@ -190,9 +209,146 @@ ostream &operator<<(ostream& out, const Error& error)
 // Lexer
 // ==================================================
 
+struct LexerResult
+{
+    vector<Token> value;
+    vector<Error> errors;
+};
+
+struct Lexer
+{
+    Lexer(string filename, string &source) : currentPos{filename, source} {}
+
+    LexerResult tokenize()
+    {
+        while (currentPos.idx < currentPos.src.size())
+        {
+            getToken();
+        }
+        return result;
+    }
+
+private:
+    LexerResult result;
+    Position currentPos;
+
+    void getToken()
+    {
+        auto previousPos = currentPos;
+        // checking if whitespace
+        if (currentPos.src[currentPos.idx] == ' ' ||
+            currentPos.src[currentPos.idx] == '\n' ||
+            currentPos.src[currentPos.idx] == '\t')
+        {
+            currentPos.advance();
+        }
+        // checking if literal
+        else if (currentPos.idx < currentPos.src.size() &&
+                 isdigit(currentPos.src[currentPos.idx]))
+        {
+            string lexical = "";
+            while (currentPos.idx < currentPos.src.size() &&
+                   isdigit(currentPos.src[currentPos.idx]))
+            {
+                lexical.push_back(currentPos.src[currentPos.idx]);
+                currentPos.advance();
+            }
+            result.value.push_back(
+                Token(TokenType::TT_LITERAL, lexical, previousPos, currentPos));
+        }
+        // checking if variable
+        else if (currentPos.idx < currentPos.src.size() &&
+                 (isalpha(currentPos.src[currentPos.idx]) ||
+                  currentPos.src[currentPos.idx] == '_'))
+        {
+            string lexical = "";
+            while (currentPos.idx < currentPos.src.size() &&
+                   (isalpha(currentPos.src[currentPos.idx]) ||
+                    isdigit(currentPos.src[currentPos.idx]) ||
+                    currentPos.src[currentPos.idx] == '_'))
+            {
+
+                lexical.push_back(currentPos.src[currentPos.idx]);
+                currentPos.advance();
+            }
+            // check if the variable is a keyword
+            if (KEYWORDS.count(lexical))
+            {
+                result.value.push_back(Token(KEYWORDS.at(lexical), lexical,
+                                             previousPos, currentPos));
+            }
+            else
+            {
+                result.value.push_back(Token(TokenType::TT_VARIABLE, lexical,
+                                             previousPos, currentPos));
+            }
+        }
+        // checking if symbol
+        else if (
+            currentPos.src[currentPos.idx] == '=' ||
+            currentPos.src[currentPos.idx] == ';' ||
+            currentPos.src[currentPos.idx] == '(' ||
+            currentPos.src[currentPos.idx] == ')' ||
+            currentPos.src[currentPos.idx] == '<' ||
+            currentPos.src[currentPos.idx] == '>' ||
+            currentPos.src[currentPos.idx] == '+' ||
+            currentPos.src[currentPos.idx] == '-' ||
+            currentPos.src[currentPos.idx] == '*' ||
+            currentPos.src[currentPos.idx] == '/')
+        {
+            string lexical = string(1, currentPos.src[currentPos.idx]);
+            currentPos.advance();
+            // checking if < or > or = follows by =
+            if ((lexical == "=" || lexical == "<" || lexical == ">") &&
+                currentPos.src[currentPos.idx] == '=')
+            {
+                lexical.push_back(currentPos.src[currentPos.idx]);
+                currentPos.advance();
+            }
+            result.value.push_back(
+                Token(SYMBOLS.at(lexical), lexical, previousPos, currentPos));
+        }
+        else
+        {
+            string details = "unexpected character '" +
+                             string(1, currentPos.src[currentPos.idx]) +
+                             "' found.";
+            currentPos.advance();
+            result.errors.push_back(Error(ErrorType::ILLEGAL_CHARACTER_ERROR,
+                                          details, previousPos, currentPos));
+        }
+    }
+};
+
 int main()
 {
-    Error e;
-    cout << e << endl;
+    string filename = "example.txt";
+
+    ifstream fs(filename);
+    string source, line;
+    while (getline(fs, line))
+    {
+        source += line + "\n";
+    }
+    fs.close();
+
+    cout << "content of " << filename << ":" << endl;
+    cout << source << endl;
+
+    Lexer lexer(filename, source);
+    auto result = lexer.tokenize();
+    if (result.errors.size())
+    {
+        for (auto error: result.errors)
+        {
+            cout << error << endl;
+        }
+        return 1;
+    }
+    for (auto token : result.value)
+    {
+        cout << token << endl;
+    }
+
     return 0;
 }
