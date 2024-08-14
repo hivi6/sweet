@@ -148,6 +148,18 @@ static const map<string, TokenType> SYMBOLS = {
     {"/", TokenType::TT_DIVIDE},
 };
 
+static const map<string, TokenType> OPERATORS = {
+    {"==", TokenType::TT_EQUAL_EQUAL},
+    {"<", TokenType::TT_LESS},
+    {"<=", TokenType::TT_LESS_EQUAL},
+    {">", TokenType::TT_GREATER},
+    {">=", TokenType::TT_GREATER_EQUAL},
+    {"+", TokenType::TT_PLUS},
+    {"-", TokenType::TT_MINUS},
+    {"*", TokenType::TT_MULTIPLY},
+    {"/", TokenType::TT_DIVIDE},
+};
+
 struct Token
 {
     TokenType typ;
@@ -513,38 +525,96 @@ struct AstProgram
     }
 };
 
-void printAstVariable(AstVariable *variable, int spaces = 0)
+void printAstVariable(AstVariable *variable, string prefix)
 {
-    string space(spaces * 2, ' ');
     cout << "AstVariable" << endl;
-    cout << space << "| " << endl;
-    cout << space << "+-" << variable->tokenVariable << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << variable->tokenVariable << endl;
 }
 
-void printAstGoto(AstGoto *astGoto, int spaces = 0)
+void printAstLiteral(AstLiteral *literal, string prefix)
 {
-    string space(spaces * 2, ' ');
+    cout << "AstLiteral" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << literal->tokenLiteral << endl;
+}
+
+void printAstPrimary(AstPrimary *primary, string prefix)
+{
+    cout << "AstPrimary" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    switch (primary->type)
+    {
+    case AstType::AST_VARIABLE:
+        printAstVariable(primary->astVariable, prefix + "  ");
+        break;
+    case AstType::AST_LITERAL:
+        printAstLiteral(primary->astLiteral, prefix + "  ");
+        break;
+    default:
+        cerr << "Error: This is very much unexpected. PANICING!!!" << endl;
+        exit(1);
+    }
+}
+
+void printAstExpression(AstExpression *expression, string prefix)
+{
+    cout << "AstExpression" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstPrimary(expression->left, prefix + "| ");
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << expression->tokenOperator << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstPrimary(expression->right, prefix + "  ");
+}
+
+void printAstGoto(AstGoto *astGoto, string prefix)
+{
     cout << "AstGoto" << endl;
-    cout << space << "| " << endl;
-    cout << space << "+-";
-    printAstVariable(astGoto->astVariable, spaces + 1);
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << astGoto->tokenGoto << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstVariable(astGoto->astVariable, prefix + "| ");
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << astGoto->tokenSemiColon << endl;
 }
 
-void printAstLabel(AstLabel *label, int spaces = 0)
+void printAstLabel(AstLabel *label, string prefix)
 {
-    string space(spaces * 2, ' ');
     cout << "AstLabel" << endl;
-    cout << space << "| " << endl;
-    cout << space << "+-";
-    printAstVariable(label->astVariable, spaces + 1);
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << label->tokenLabel << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstVariable(label->astVariable, prefix + "| ");
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << label->tokenSemiColon << endl;
 }
 
-void printAstStatement(AstStatement *statement, int spaces = 0)
+void printAstAssign(AstAssign *assign, string prefix)
 {
-    string space(spaces * 2, ' ');
+    cout << "AstAssign" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstVariable(assign->astVariable, prefix + "| ");
+    cout << prefix << "|" << endl;
+    cout << prefix << "+-" << assign->tokenEqual << endl;
+    cout << prefix << "|" << endl;
+    cout << prefix << "+-";
+    printAstExpression(assign->astExpression, prefix + "| ");
+    cout << prefix << "|" << endl;
+    cout << prefix << "+-" << assign->tokenSemiColon << endl;
+}
+
+void printAstStatement(AstStatement *statement, string prefix)
+{
     cout << "AstStatement" << endl;
-    cout << space << "| " << endl;
-    cout << space << "+-";
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
     switch (statement->type)
     {
     // case AstType::AST_PRINT:
@@ -554,13 +624,13 @@ void printAstStatement(AstStatement *statement, int spaces = 0)
     //     printAstIf(statement->astIf, spaces + 1);
     //     break;
     case AstType::AST_GOTO:
-        printAstGoto(statement->astGoto, spaces + 1);
+        printAstGoto(statement->astGoto, prefix + "  ");
         break;
-    // case AstType::AST_ASSIGN:
-    //     printAstAssign(statement->astAssign, spaces + 1);
-    //     break;
+    case AstType::AST_ASSIGN:
+        printAstAssign(statement->astAssign, prefix + "  ");
+        break;
     case AstType::AST_LABEL:
-        printAstLabel(statement->astLabel, spaces + 1);
+        printAstLabel(statement->astLabel, prefix + "  ");
         break;
     default:
         cerr << "Error: This is very much unexpected. PANICING!!!" << endl;
@@ -568,15 +638,16 @@ void printAstStatement(AstStatement *statement, int spaces = 0)
     }
 }
 
-void printAstProgram(AstProgram *program, int spaces = 0)
+void printAstProgram(AstProgram *program, string prefix = "")
 {
-    string space(spaces * 2, ' ');
     cout << "AstProgram" << endl;
-    for (auto statement : program->statements)
+    for (int i = 0; i < program->statements.size(); i++)
     {
-        cout << space << "| " << endl;
-        cout << space << "+-";
-        printAstStatement(statement, spaces + 1);
+        cout << prefix << "| " << endl;
+        cout << prefix << "+-";
+        auto tempPrefix = (i == program->statements.size() - 1 ? prefix + "  "
+                                                               : prefix + "| ");
+        printAstStatement(program->statements[i], tempPrefix);
     }
 }
 
@@ -621,6 +692,13 @@ private:
     {
         if (tokens[cur].typ == TokenType::TT_VARIABLE)
         {
+            auto res = parseAssign();
+            if (res == nullptr)
+                return nullptr;
+            auto ast = new AstStatement;
+            ast->type = AstType::AST_ASSIGN;
+            ast->astAssign = res;
+            return ast;
         }
         if (tokens[cur].typ == TokenType::TT_LABEL)
         {
@@ -649,10 +727,7 @@ private:
         {
         }
         // something went wrong, unexprected token
-        string details = "unexpected token '" + tokens[cur].lex + "'.";
-        auto error = Error(ErrorType::UNEXPECTED_TOKEN_ERROR, details,
-                           tokens[cur].startPos, tokens[cur].endPos);
-        results.errors.push_back(error);
+        return (AstStatement *)unexpectedError(tokens[cur]);
         return nullptr;
     }
 
@@ -661,26 +736,11 @@ private:
         auto labelToken = tokens[cur++];
         auto astVariable = parseVariable();
         if (astVariable == nullptr)
-        {
             return nullptr;
-        }
         if (cur >= tokens.size())
-        {
-            string details = "expected ';', instead reached eof.";
-            auto error = Error(ErrorType::EOF_ERROR, details,
-                               tokens.back().startPos, tokens.back().endPos);
-            results.errors.push_back(error);
-            return nullptr;
-        }
+            return (AstLabel *)eofError(tokens.back(), ";");
         if (tokens[cur].typ != TokenType::TT_SEMI_COLON)
-        {
-            string details = "unexpected token '" + tokens[cur].lex +
-                             "' found, was expecting a ';'.";
-            auto error = Error(ErrorType::UNEXPECTED_TOKEN_ERROR, details,
-                               tokens[cur].startPos, tokens[cur].endPos);
-            results.errors.push_back(error);
-            return nullptr;
-        }
+            return (AstLabel *)unexpectedError(tokens[cur], ";");
         auto semiColonToken = tokens[cur++];
         auto res = new AstLabel;
         res->tokenLabel = labelToken;
@@ -691,32 +751,17 @@ private:
 
     AstGoto *parseGoto()
     {
-        auto labelToken = tokens[cur++];
+        auto gotoToken = tokens[cur++];
         auto astVariable = parseVariable();
         if (astVariable == nullptr)
-        {
             return nullptr;
-        }
         if (cur >= tokens.size())
-        {
-            string details = "expected ';', instead reached eof.";
-            auto error = Error(ErrorType::EOF_ERROR, details,
-                               tokens.back().startPos, tokens.back().endPos);
-            results.errors.push_back(error);
-            return nullptr;
-        }
+            return (AstGoto *)eofError(tokens.back(), ";");
         if (tokens[cur].typ != TokenType::TT_SEMI_COLON)
-        {
-            string details = "unexpected token '" + tokens[cur].lex +
-                             "' found, was expecting a ';'.";
-            auto error = Error(ErrorType::UNEXPECTED_TOKEN_ERROR, details,
-                               tokens[cur].startPos, tokens[cur].endPos);
-            results.errors.push_back(error);
-            return nullptr;
-        }
+            return (AstGoto *)unexpectedError(tokens[cur], ";");
         auto semiColonToken = tokens[cur++];
         auto res = new AstGoto;
-        res->tokenGoto = labelToken;
+        res->tokenGoto = gotoToken;
         res->astVariable = astVariable;
         res->tokenSemiColon = semiColonToken;
         return res;
@@ -725,25 +770,134 @@ private:
     AstVariable *parseVariable()
     {
         if (cur >= tokens.size())
-        {
-            string details = "expected ';', instead reached eof.";
-            auto error = Error(ErrorType::EOF_ERROR, details,
-                               tokens.back().startPos, tokens.back().endPos);
-            results.errors.push_back(error);
-            return nullptr;
-        }
+            return (AstVariable *)eofError(tokens.back(), "variable");
         if (tokens[cur].typ != TokenType::TT_VARIABLE)
-        {
-            string details = "unexpected token '" + tokens[cur].lex +
-                             "' found, was expecting a variable.";
-            auto error = Error(ErrorType::UNEXPECTED_TOKEN_ERROR, details,
-                               tokens[cur].startPos, tokens[cur].endPos);
-            results.errors.push_back(error);
-            return nullptr;
-        }
+            return (AstVariable *)unexpectedError(tokens[cur], "variable");
         auto res = new AstVariable;
         res->tokenVariable = tokens[cur++];
         return res;
+    }
+
+    AstAssign *parseAssign()
+    {
+        auto astVariable = parseVariable();
+        if (astVariable == nullptr)
+            return nullptr;
+
+        if (cur >= tokens.size())
+            return (AstAssign *)eofError(tokens.back(), "=");
+        if (tokens[cur].typ != TokenType::TT_EQUAL)
+            return (AstAssign *)unexpectedError(tokens[cur], "=");
+        auto equalToken = tokens[cur++];
+
+        auto astExpression = parseExpression();
+        if (astExpression == nullptr)
+            return nullptr;
+
+        if (cur >= tokens.size())
+            return (AstAssign *)eofError(tokens.back(), ";");
+        if (tokens[cur].typ != TokenType::TT_SEMI_COLON)
+            return (AstAssign *)unexpectedError(tokens[cur], ";");
+        auto semiColonToken = tokens[cur++];
+
+        auto res = new AstAssign;
+        res->astVariable = astVariable;
+        res->tokenEqual = equalToken;
+        res->astExpression = astExpression;
+        res->tokenSemiColon = semiColonToken;
+        return res;
+    }
+
+    AstExpression *parseExpression()
+    {
+        auto left = parsePrimary();
+        if (left == nullptr)
+            return nullptr;
+
+        // check if the operator exists
+        if (cur >= tokens.size())
+            return (AstExpression *)eofError(tokens.back(), "operator");
+        bool isOperator = false;
+        for (auto op : OPERATORS)
+        {
+            if (op.second == tokens[cur].typ)
+            {
+                isOperator = true;
+                break;
+            }
+        }
+        if (!isOperator)
+            return (AstExpression *)unexpectedError(tokens[cur], "operator");
+        auto op = tokens[cur++];
+
+        auto right = parsePrimary();
+        if (left == nullptr)
+            return nullptr;
+
+        auto res = new AstExpression;
+        res->left = left;
+        res->right = right;
+        res->tokenOperator = op;
+        return res;
+    }
+
+    AstPrimary *parsePrimary()
+    {
+        if (cur >= tokens.size())
+            return (AstPrimary *)eofError(tokens.back(), "primary");
+        if (tokens[cur].typ == TokenType::TT_VARIABLE)
+        {
+            auto astVariable = parseVariable();
+            if (astVariable == nullptr)
+                return nullptr;
+            auto res = new AstPrimary;
+            res->type = AstType::AST_VARIABLE;
+            res->astVariable = astVariable;
+            return res;
+        }
+        if (tokens[cur].typ == TokenType::TT_LITERAL)
+        {
+            auto astLiteral = parseLiteral();
+            if (astLiteral == nullptr)
+                return nullptr;
+            auto res = new AstPrimary;
+            res->type = AstType::AST_VARIABLE;
+            res->astLiteral = astLiteral;
+            return res;
+        }
+    }
+
+    AstLiteral *parseLiteral()
+    {
+        if (cur >= tokens.size())
+            return (AstLiteral *)eofError(tokens.back(), "literal");
+        if (tokens[cur].typ != TokenType::TT_LITERAL)
+            return (AstLiteral *)unexpectedError(tokens[cur], "literal");
+        auto res = new AstLiteral;
+        res->tokenLiteral = tokens[cur++];
+        return res;
+    }
+
+    // helper functions
+
+    void *eofError(Token token, string expected)
+    {
+        string details = "expected '" + expected + "', instead reached eof.";
+        auto error = Error(ErrorType::EOF_ERROR, details,
+                           token.startPos, token.endPos);
+        results.errors.push_back(error);
+        return nullptr;
+    }
+
+    void *unexpectedError(Token token, string expected = "")
+    {
+        string details = "unexpected token '" + token.lex + "' found";
+        if (expected != "")
+            details += ", was expecting '" + expected + "'.";
+        auto error = Error(ErrorType::UNEXPECTED_TOKEN_ERROR, details,
+                           token.startPos, token.endPos);
+        results.errors.push_back(error);
+        return nullptr;
     }
 };
 
