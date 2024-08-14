@@ -904,6 +904,8 @@ private:
             res->astLiteral = astLiteral;
             return res;
         }
+        // something went wrong, unexprected token
+        return (AstPrimary *)unexpectedError(tokens[cur]);
     }
 
     AstLiteral *parseLiteral()
@@ -963,8 +965,10 @@ int main(int argc, const char **argv)
     }
     fs.close();
 
-    cout << "content of " << filename << ":" << endl;
+    cout << "===== content of " << filename << " =====" << endl;
     cout << source << endl;
+    cout << "===== end of content =====" << endl;
+    cout << endl;
 
     Lexer lexer(filename, source);
     auto lexerResult = lexer.tokenize();
@@ -976,10 +980,12 @@ int main(int argc, const char **argv)
         }
         return 1;
     }
+    cout << "===== all the tokens =====" << endl;
     for (auto token : lexerResult.value)
     {
         cout << token << endl;
     }
+    cout << "===== end of all the tokens =====" << endl;
     cout << endl;
 
     Parser parser(lexerResult.value);
@@ -993,7 +999,9 @@ int main(int argc, const char **argv)
         return 1;
     }
 
+    cout << "===== start of ast =====" << endl;
     printAstProgram(parserResult.value.get());
+    cout << "===== end of ast tree =====" << endl;
 
     return 0;
 }
