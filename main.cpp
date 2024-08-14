@@ -63,7 +63,7 @@ struct Position
 
 ostream &operator<<(ostream &out, const Position &pos)
 {
-    out << pos.fname << ":" << pos.idx << ":" << pos.ln << ":" << pos.col;
+    out << pos.fname << ":" << pos.ln << ":" << pos.col;
     return out;
 }
 
@@ -201,7 +201,8 @@ struct Error
 
 ostream &operator<<(ostream &out, const Error &error)
 {
-    out << ERROR_NAME.at(error.typ) << ": " << error.deets;
+    out << error.startPos << " " << ERROR_NAME.at(error.typ)
+        << ": " << error.deets;
     return out;
 }
 
@@ -320,11 +321,22 @@ private:
     }
 };
 
-int main()
+int main(int argc, const char **argv)
 {
-    string filename = "example.txt";
+    if (argc <= 1)
+    {
+        cerr << "Error: expected an input file." << endl;
+        return 1;
+    }
+    string filename(argv[1]);
 
     ifstream fs(filename);
+    if (!fs.good())
+    {
+        cerr << "Error: no such file '" << filename << "' exists." << endl;
+        return 1;
+    }
+
     string source, line;
     while (getline(fs, line))
     {
@@ -339,9 +351,9 @@ int main()
     auto result = lexer.tokenize();
     if (result.errors.size())
     {
-        for (auto error: result.errors)
+        for (auto error : result.errors)
         {
-            cout << error << endl;
+            cerr << error << endl;
         }
         return 1;
     }
