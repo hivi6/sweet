@@ -3,3 +3,5 @@ label abc;
 goto abc;
 goto xyz;
 x = a + 12;
+print x - 1;
+print a + 12;

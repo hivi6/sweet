@@ -595,6 +595,18 @@ void printAstLabel(AstLabel *label, string prefix)
     cout << prefix << "+-" << label->tokenSemiColon << endl;
 }
 
+void printAstPrint(AstPrint *print, string prefix)
+{
+    cout << "AstPrint" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << print->tokenPrint << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstExpression(print->astExpression, prefix + "| ");
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << print->tokenSemiColon << endl;
+}
+
 void printAstAssign(AstAssign *assign, string prefix)
 {
     cout << "AstAssign" << endl;
@@ -617,9 +629,9 @@ void printAstStatement(AstStatement *statement, string prefix)
     cout << prefix << "+-";
     switch (statement->type)
     {
-    // case AstType::AST_PRINT:
-    //     printAstPrint(statement->astPrint, spaces + 1);
-    //     break;
+    case AstType::AST_PRINT:
+        printAstPrint(statement->astPrint, prefix + "  ");
+        break;
     // case AstType::AST_IF:
     //     printAstIf(statement->astIf, spaces + 1);
     //     break;
@@ -725,10 +737,37 @@ private:
         }
         if (tokens[cur].typ == TokenType::TT_PRINT)
         {
+            auto res = parsePrint();
+            if (res == nullptr)
+                return nullptr;
+            auto ast = new AstStatement;
+            ast->type = AstType::AST_PRINT;
+            ast->astPrint = res;
+            return ast;
         }
         // something went wrong, unexprected token
         return (AstStatement *)unexpectedError(tokens[cur]);
         return nullptr;
+    }
+
+    AstPrint *parsePrint()
+    {
+        auto printToken = tokens[cur++];
+        auto astExpression = parseExpression();
+        if (astExpression == nullptr)
+            return nullptr;
+        
+        if (cur >= tokens.size())
+            return (AstPrint *)eofError(tokens.back(), ";");
+        if (tokens[cur].typ != TokenType::TT_SEMI_COLON)
+            return (AstPrint *)unexpectedError(tokens[cur], ";");
+        auto semiColonToken = tokens[cur++];
+
+        auto res = new AstPrint;
+        res->tokenPrint = printToken;
+        res->astExpression = astExpression;
+        res->tokenSemiColon = semiColonToken;
+        return res;
     }
 
     AstLabel *parseLabel()
