@@ -1,7 +1,5 @@
-label xyz;
-label abc;
-goto abc;
-goto xyz;
-x = a + 12;
-print x - 1;
-print a + 12;
+a = 0;
+label start;
+print a;
+a = a + 1;
+if (a <= 10) goto start;

@@ -17,6 +17,7 @@ gotoStatement   := "goto" <variable> ";"
 ifStatement     := "if" "(" <expression> ")" <statement>
 printStatement  := "print" <expression> ";"
 expression      := <primary> <operator> <primary>
+                 | <primary>
 primary         := <variable> | <literal>
 operator        := "+" | "-" | "/" | "*" | "<" | "<=" | ">" | ">=" | "=="
 variable        := [a-zA-Z_][0-9a-zA-Z_]+

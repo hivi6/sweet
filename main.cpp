@@ -525,144 +525,6 @@ struct AstProgram
     }
 };
 
-void printAstVariable(AstVariable *variable, string prefix)
-{
-    cout << "AstVariable" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << variable->tokenVariable << endl;
-}
-
-void printAstLiteral(AstLiteral *literal, string prefix)
-{
-    cout << "AstLiteral" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << literal->tokenLiteral << endl;
-}
-
-void printAstPrimary(AstPrimary *primary, string prefix)
-{
-    cout << "AstPrimary" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-";
-    switch (primary->type)
-    {
-    case AstType::AST_VARIABLE:
-        printAstVariable(primary->astVariable, prefix + "  ");
-        break;
-    case AstType::AST_LITERAL:
-        printAstLiteral(primary->astLiteral, prefix + "  ");
-        break;
-    default:
-        cerr << "Error: This is very much unexpected. PANICING!!!" << endl;
-        exit(1);
-    }
-}
-
-void printAstExpression(AstExpression *expression, string prefix)
-{
-    cout << "AstExpression" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-";
-    printAstPrimary(expression->left, prefix + "| ");
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << expression->tokenOperator << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-";
-    printAstPrimary(expression->right, prefix + "  ");
-}
-
-void printAstGoto(AstGoto *astGoto, string prefix)
-{
-    cout << "AstGoto" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << astGoto->tokenGoto << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-";
-    printAstVariable(astGoto->astVariable, prefix + "| ");
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << astGoto->tokenSemiColon << endl;
-}
-
-void printAstLabel(AstLabel *label, string prefix)
-{
-    cout << "AstLabel" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << label->tokenLabel << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-";
-    printAstVariable(label->astVariable, prefix + "| ");
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << label->tokenSemiColon << endl;
-}
-
-void printAstPrint(AstPrint *print, string prefix)
-{
-    cout << "AstPrint" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << print->tokenPrint << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-";
-    printAstExpression(print->astExpression, prefix + "| ");
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-" << print->tokenSemiColon << endl;
-}
-
-void printAstAssign(AstAssign *assign, string prefix)
-{
-    cout << "AstAssign" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-";
-    printAstVariable(assign->astVariable, prefix + "| ");
-    cout << prefix << "|" << endl;
-    cout << prefix << "+-" << assign->tokenEqual << endl;
-    cout << prefix << "|" << endl;
-    cout << prefix << "+-";
-    printAstExpression(assign->astExpression, prefix + "| ");
-    cout << prefix << "|" << endl;
-    cout << prefix << "+-" << assign->tokenSemiColon << endl;
-}
-
-void printAstStatement(AstStatement *statement, string prefix)
-{
-    cout << "AstStatement" << endl;
-    cout << prefix << "| " << endl;
-    cout << prefix << "+-";
-    switch (statement->type)
-    {
-    case AstType::AST_PRINT:
-        printAstPrint(statement->astPrint, prefix + "  ");
-        break;
-    // case AstType::AST_IF:
-    //     printAstIf(statement->astIf, spaces + 1);
-    //     break;
-    case AstType::AST_GOTO:
-        printAstGoto(statement->astGoto, prefix + "  ");
-        break;
-    case AstType::AST_ASSIGN:
-        printAstAssign(statement->astAssign, prefix + "  ");
-        break;
-    case AstType::AST_LABEL:
-        printAstLabel(statement->astLabel, prefix + "  ");
-        break;
-    default:
-        cerr << "Error: This is very much unexpected. PANICING!!!" << endl;
-        exit(1);
-    }
-}
-
-void printAstProgram(AstProgram *program, string prefix = "")
-{
-    cout << "AstProgram" << endl;
-    for (int i = 0; i < program->statements.size(); i++)
-    {
-        cout << prefix << "| " << endl;
-        cout << prefix << "+-";
-        auto tempPrefix = (i == program->statements.size() - 1 ? prefix + "  "
-                                                               : prefix + "| ");
-        printAstStatement(program->statements[i], tempPrefix);
-    }
-}
-
 // ==================================================
 // Parser
 // ==================================================
@@ -734,6 +596,13 @@ private:
         }
         if (tokens[cur].typ == TokenType::TT_IF)
         {
+            auto res = parseIf();
+            if (res == nullptr)
+                return nullptr;
+            auto ast = new AstStatement;
+            ast->type = AstType::AST_IF;
+            ast->astIf = res;
+            return ast;
         }
         if (tokens[cur].typ == TokenType::TT_PRINT)
         {
@@ -750,13 +619,46 @@ private:
         return nullptr;
     }
 
+    AstIf *parseIf()
+    {
+        auto ifToken = tokens[cur++];
+
+        if (cur >= tokens.size())
+            return (AstIf *)eofError(tokens.back(), "(");
+        if (tokens[cur].typ != TokenType::TT_LPAREN)
+            return (AstIf *)unexpectedError(tokens[cur], "(");
+        auto lParenToken = tokens[cur++];
+
+        auto astExpression = parseExpression();
+        if (astExpression == nullptr)
+            return nullptr;
+
+        if (cur >= tokens.size())
+            return (AstIf *)eofError(tokens.back(), ")");
+        if (tokens[cur].typ != TokenType::TT_RPAREN)
+            return (AstIf *)unexpectedError(tokens[cur], ")");
+        auto rParenToken = tokens[cur++];
+
+        auto astStatement = parseStatement();
+        if (astStatement == nullptr)
+            return nullptr;
+
+        auto res = new AstIf;
+        res->tokenIf = ifToken;
+        res->tokenLParen = lParenToken;
+        res->astExpression = astExpression;
+        res->tokenRParen = rParenToken;
+        res->astStatement = astStatement;
+        return res;
+    }
+
     AstPrint *parsePrint()
     {
         auto printToken = tokens[cur++];
         auto astExpression = parseExpression();
         if (astExpression == nullptr)
             return nullptr;
-        
+
         if (cur >= tokens.size())
             return (AstPrint *)eofError(tokens.back(), ";");
         if (tokens[cur].typ != TokenType::TT_SEMI_COLON)
@@ -855,7 +757,7 @@ private:
 
         // check if the operator exists
         if (cur >= tokens.size())
-            return (AstExpression *)eofError(tokens.back(), "operator");
+            return (AstExpression *)eofError(tokens.back(), ";");
         bool isOperator = false;
         for (auto op : OPERATORS)
         {
@@ -866,7 +768,12 @@ private:
             }
         }
         if (!isOperator)
-            return (AstExpression *)unexpectedError(tokens[cur], "operator");
+        {
+            auto res = new AstExpression;
+            res->left = left;
+            res->right = nullptr;
+            return res;
+        }
         auto op = tokens[cur++];
 
         auto right = parsePrimary();
@@ -941,6 +848,171 @@ private:
         return nullptr;
     }
 };
+
+// ==================================================
+// Print AST
+// ==================================================
+
+void printAstVariable(AstVariable *variable, string prefix)
+{
+    cout << "AstVariable" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << variable->tokenVariable << endl;
+}
+
+void printAstLiteral(AstLiteral *literal, string prefix)
+{
+    cout << "AstLiteral" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << literal->tokenLiteral << endl;
+}
+
+void printAstPrimary(AstPrimary *primary, string prefix)
+{
+    cout << "AstPrimary" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    switch (primary->type)
+    {
+    case AstType::AST_VARIABLE:
+        printAstVariable(primary->astVariable, prefix + "  ");
+        break;
+    case AstType::AST_LITERAL:
+        printAstLiteral(primary->astLiteral, prefix + "  ");
+        break;
+    default:
+        cerr << "Error: This is very much unexpected. PANICING!!!" << endl;
+        exit(1);
+    }
+}
+
+void printAstExpression(AstExpression *expression, string prefix)
+{
+    cout << "AstExpression" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    auto tempPrefix = expression->right ? prefix + "| " : prefix + "  ";
+    printAstPrimary(expression->left, tempPrefix);
+    if (expression->right)
+    {
+        cout << prefix << "| " << endl;
+        cout << prefix << "+-" << expression->tokenOperator << endl;
+        cout << prefix << "| " << endl;
+        cout << prefix << "+-";
+        printAstPrimary(expression->right, prefix + "  ");
+    }
+}
+
+void printAstGoto(AstGoto *astGoto, string prefix)
+{
+    cout << "AstGoto" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << astGoto->tokenGoto << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstVariable(astGoto->astVariable, prefix + "| ");
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << astGoto->tokenSemiColon << endl;
+}
+
+void printAstLabel(AstLabel *label, string prefix)
+{
+    cout << "AstLabel" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << label->tokenLabel << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstVariable(label->astVariable, prefix + "| ");
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << label->tokenSemiColon << endl;
+}
+
+void printAstPrint(AstPrint *print, string prefix)
+{
+    cout << "AstPrint" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << print->tokenPrint << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstExpression(print->astExpression, prefix + "| ");
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << print->tokenSemiColon << endl;
+}
+
+void printAstAssign(AstAssign *assign, string prefix)
+{
+    cout << "AstAssign" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstVariable(assign->astVariable, prefix + "| ");
+    cout << prefix << "|" << endl;
+    cout << prefix << "+-" << assign->tokenEqual << endl;
+    cout << prefix << "|" << endl;
+    cout << prefix << "+-";
+    printAstExpression(assign->astExpression, prefix + "| ");
+    cout << prefix << "|" << endl;
+    cout << prefix << "+-" << assign->tokenSemiColon << endl;
+}
+
+void printAstStatement(AstStatement *statement, string prefix);
+
+void printAstIf(AstIf *astIf, string prefix)
+{
+    cout << "AstIf" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << astIf->tokenIf << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << astIf->tokenLParen << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstExpression(astIf->astExpression, prefix + "| ");
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-" << astIf->tokenRParen << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    printAstStatement(astIf->astStatement, prefix + "  ");
+}
+
+void printAstStatement(AstStatement *statement, string prefix)
+{
+    cout << "AstStatement" << endl;
+    cout << prefix << "| " << endl;
+    cout << prefix << "+-";
+    switch (statement->type)
+    {
+    case AstType::AST_PRINT:
+        printAstPrint(statement->astPrint, prefix + "  ");
+        break;
+    case AstType::AST_IF:
+        printAstIf(statement->astIf, prefix + "  ");
+        break;
+    case AstType::AST_GOTO:
+        printAstGoto(statement->astGoto, prefix + "  ");
+        break;
+    case AstType::AST_ASSIGN:
+        printAstAssign(statement->astAssign, prefix + "  ");
+        break;
+    case AstType::AST_LABEL:
+        printAstLabel(statement->astLabel, prefix + "  ");
+        break;
+    default:
+        cerr << "Error: This is very much unexpected. PANICING!!!" << endl;
+        exit(1);
+    }
+}
+
+void printAstProgram(AstProgram *program, string prefix = "")
+{
+    cout << "AstProgram" << endl;
+    for (int i = 0; i < program->statements.size(); i++)
+    {
+        cout << prefix << "| " << endl;
+        cout << prefix << "+-";
+        auto tempPrefix = (i == program->statements.size() - 1 ? prefix + "  "
+                                                               : prefix + "| ");
+        printAstStatement(program->statements[i], tempPrefix);
+    }
+}
 
 int main(int argc, const char **argv)
 {
